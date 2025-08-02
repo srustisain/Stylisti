@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Icon Generator</title>
+</head>
+<body>
+    <canvas id="canvas192" width="192" height="192" style="border: 1px solid #ccc; margin: 10px;"></canvas>
+    <canvas id="canvas512" width="512" height="512" style="border: 1px solid #ccc; margin: 10px;"></canvas>
+    <br>
+    <button onclick="downloadIcon(192)">Download 192px Icon</button>
+    <button onclick="downloadIcon(512)">Download 512px Icon</button>
+    
+    <script>
+        function createIcon(size) {
+            const canvas = document.getElementById(`canvas${size}`);
+            const ctx = canvas.getContext('2d');
+            
+            // Fill background with maroon
+            ctx.fillStyle = '#800020';
+            ctx.fillRect(0, 0, size, size);
+            
+            // Draw white circle
+            const centerX = size / 2;
+            const centerY = size / 2;
+            const radius = size * 0.35;
+            
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fill();
+            
+            // Draw maroon 'S' in center
+            ctx.fillStyle = '#800020';
+            ctx.font = `bold ${size * 0.4}px -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('S', centerX, centerY);
+        }
+        
+        function downloadIcon(size) {
+            const canvas = document.getElementById(`canvas${size}`);
+            const link = document.createElement('a');
+            link.download = `icon-${size}.png`;
+            link.href = canvas.toDataURL();
+            link.click();
+        }
+        
+        // Create icons on load
+        createIcon(192);
+        createIcon(512);
+    </script>
+</body>
+</html>

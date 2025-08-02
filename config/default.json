@@ -1,0 +1,40 @@
+{
+  "database": {
+    "path": "data/style.db",
+    "backupEnabled": true,
+    "backupInterval": "daily"
+  },
+  "ai": {
+    "provider": "openai",
+    "model": "gpt-4-vision-preview",
+    "enableVisionAnalysis": true,
+    "confidenceThreshold": 0.7
+  },
+  "photos": {
+    "storageDir": "data/photos",
+    "maxSizeMB": 50,
+    "allowedFormats": ["jpg", "jpeg", "png", "webp", "heic", "heif"],
+    "thumbnailSize": 256
+  },
+  "recommendations": {
+    "maxSuggestions": 5,
+    "weatherApiEnabled": true,
+    "weatherApiKey": "",
+    "considerSeasonalTrends": true
+  },
+  "privacy": {
+    "localProcessingOnly": false,
+    "encryptSensitiveData": true,
+    "anonymizeExports": true
+  },
+  "analysis": {
+    "minOutfitsForPatterns": 10,
+    "confidenceTrendWindow": 30,
+    "defaultAnalysisPeriod": "month"
+  },
+  "wardrobe": {
+    "autoTrackWearCount": true,
+    "suggestDonationThreshold": 365,
+    "calculateCostPerWear": true
+  }
+}
