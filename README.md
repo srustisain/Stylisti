@@ -1,4 +1,4 @@
-# Style MCP - Personal Outfit Tracking & Recommendations
+# Stylisti App - Personal Outfit Tracking & Recommendations
 
 A Modular Control Protocol (MCP) server for organizing and optimizing personal outfit tracking with AI-powered style recommendations.
 
