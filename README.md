@@ -1,229 +1,212 @@
-# Stylisti App - Personal Outfit Tracking & Recommendations
+# Stylisti - AI Style Assistant PWA 👗✨
 
-A Modular Control Protocol (MCP) server for organizing and optimizing personal outfit tracking with AI-powered style recommendations.
+A modern Progressive Web App (PWA) that serves as your personal AI-powered style assistant. Upload outfits, get AI recommendations, and track your style journey - all from your mobile device!
 
 ## 🌟 Features
 
-- **📸 Outfit Logging**: Capture outfits with photos, tags, and context
-- **🎯 Smart Recommendations**: AI-powered outfit suggestions based on weather, occasion, and personal style
-- **📊 Style Analytics**: Track confidence trends, comfort patterns, and style evolution
-- **👗 Wardrobe Management**: Complete inventory tracking with usage analytics
-- **🔍 Pattern Analysis**: Identify successful outfit formulas and wardrobe gaps
-- **🤖 AI Integration**: Computer vision for outfit analysis and personalized insights
-- **🌐 Web Interface**: Drag & drop photo uploads with mobile-friendly design
-- **🔒 Privacy-First**: 100% local processing - your photos never leave your device
+- **📱 Progressive Web App**: Install on your phone's home screen like a native app
+- **📸 Outfit Upload**: Drag & drop or tap to upload outfit photos
+- **🤖 AI Chat Assistant**: Chat with GPT-4 Vision for personalized style advice
+- **📋 Occasion Planner**: Get outfit suggestions based on weather, occasion, and mood
+- **👗 Digital Lookbook**: Browse your outfit history with real-time updates
+- **☁️ Cloud Storage**: Photos securely stored in Firebase Storage
+- **📅 Calendar Integration**: Track outfits by date
+- **🎨 Custom Branding**: Beautiful custom icons and modern UI
 
-## 🚀 Quick Start
+## 🚀 Live Demo
 
-### Installation
+**🌐 Visit**: [https://stylisti.vercel.app](https://stylisti.vercel.app)
 
-```bash
-# Clone the repository
-git clone <repository-url>
-cd Stylisti-1
+**📱 Install as PWA**:
+1. Open the app in your mobile browser
+2. Tap "Add to Home Screen" 
+3. Enjoy native app experience!
 
-# Install dependencies
-npm install
+## 💻 Tech Stack
 
-# Initialize database
-npm run build
-npm start
+### Frontend
+- **HTML5 + CSS3 + JavaScript** (Vanilla JS, no frameworks)
+- **Progressive Web App** (PWA) with Service Worker
+- **Responsive Design** optimized for mobile
+- **Firebase Storage** for photo management
+
+### Backend
+- **Node.js + Express.js** server
+- **Vercel Serverless** deployment
+- **OpenAI GPT-4 Vision** for AI recommendations
+- **Firebase Authentication** (anonymous)
+- **Sharp** for image processing
+
+### Deployment
+- **Vercel** for hosting and deployment
+- **GitHub** for version control
+- **Custom Domain** ready
+
+## 📂 Project Structure
+
+```
+Stylisti-1/
+├── web-interface/
+│   ├── app.html          # Main PWA interface
+│   ├── server.js         # Express.js backend
+│   ├── manifest.json     # PWA manifest
+│   ├── sw.js            # Service Worker
+│   ├── icon-192.png     # App icons
+│   └── icon-512.png     
+├── vercel.json          # Vercel deployment config
+├── package.json         # Dependencies
+└── README.md           # This file
 ```
 
-### Basic Usage
+## 🛠️ Local Development
 
-#### Option 1: Complete Web App (Recommended) 🌟
-```bash
-# One command starts everything!
-npm run app
+### Prerequisites
+- Node.js 18+
+- Firebase project (for photo storage)
+- OpenAI API key (for AI chat)
 
-# Opens automatically:
-# 📱 Web Interface: http://localhost:3000
-# 🔧 MCP Server: Background process
-# Drag & drop photos, tag outfits, get instant AI analysis!
-```
+### Setup
 
-#### Option 2: Manual Startup
-```bash
-# Start the MCP server
-npm start
-
-# In another terminal, start the web interface
-npm run web
-
-# Open your browser to http://localhost:3000
-```
-
-#### Option 3: Command Line Interface
-1. **Log your first outfit:**
+1. **Clone the repository**
    ```bash
-   # Using MCP client
-   mcp-client call style-mcp log_outfit \
-     --photo_path "my-outfit.jpg" \
-     --occasion '["work"]' \
-     --mood "confident" \
-     --style_tags '["professional", "minimalist"]'
+   git clone https://github.com/srustisain/Stylisti.git
+   cd Stylisti-1
    ```
 
-2. **Get outfit recommendations:**
+2. **Install dependencies**
    ```bash
-   mcp-client call style-mcp get_outfit_recommendations \
-     --occasion "work" \
-     --weather '{"temperature": 72, "condition": "sunny"}'
+   npm install
    ```
 
-3. **Rate your outfit at day's end:**
-   ```bash
-   mcp-client call style-mcp rate_outfit \
-     --outfit_id "outfit-123" \
-     --confidence 8 \
-     --comfort 9 \
-     --success 7
+3. **Set up environment variables**
+   Create a `.env` file:
+   ```env
+   OPENAI_API_KEY=your_openai_api_key
+   FIREBASE_API_KEY=your_firebase_api_key
+   FIREBASE_AUTH_DOMAIN=your_project.firebaseapp.com
+   FIREBASE_PROJECT_ID=your_project_id
+   FIREBASE_STORAGE_BUCKET=your_project.appspot.com
+   FIREBASE_MESSAGING_SENDER_ID=your_sender_id
+   FIREBASE_APP_ID=your_app_id
    ```
 
-## 📋 MCP Tools Available
+4. **Start development server**
+   ```bash
+   npm start
+   # or
+   npm run dev
+   ```
 
-### Outfit Management
-- `log_outfit` - Log new outfits with photos and context
-- `rate_outfit` - Rate outfit performance throughout the day
-- `get_outfit_recommendations` - Get AI-powered suggestions
-- `search_outfits` - Search your outfit history
-- `get_outfit_details` - View detailed outfit information
+5. **Open in browser**
+   ```
+   http://localhost:3000
+   ```
 
-### Style Analysis
-- `analyze_style_patterns` - Identify trends and patterns
-- `get_style_insights` - Get personalized recommendations
-- `generate_style_report` - Create comprehensive style reports
-- `track_confidence_trends` - Monitor confidence over time
-- `identify_go_to_outfits` - Find your most successful combinations
+## 🚀 Deployment
 
-### Wardrobe Management
-- `add_wardrobe_item` - Add items to your inventory
-- `get_wardrobe_inventory` - View and filter your wardrobe
-- `wardrobe_gap_analysis` - Identify missing pieces
-- `analyze_wardrobe_usage` - Track item wear frequency
-- `calculate_cost_per_wear` - Analyze clothing value
+### Vercel Deployment (Recommended)
 
-## 🏗️ Architecture
+1. **Connect to Vercel**
+   ```bash
+   # Install Vercel CLI
+   npm i -g vercel
+   
+   # Deploy
+   vercel --prod
+   ```
 
-```
-Style MCP/
-├── Core Server (MCP Protocol)
-├── Database Layer (SQLite)
-├── AI Engine (Style Analysis)
-├── Photo Management
-└── Analytics & Reporting
-```
+2. **Set Environment Variables**
+   - Go to Vercel Dashboard
+   - Add your Firebase and OpenAI environment variables
+   - Redeploy
 
-### Key Components
+3. **Custom Domain** (Optional)
+   - Add your custom domain in Vercel settings
+   - Update DNS records as instructed
 
-- **MCP Server**: Standard MCP protocol implementation
-- **Database**: SQLite for local data storage
-- **AI Engine**: Pattern recognition and recommendations
-- **Photo Storage**: Local file management with metadata
-- **Analytics**: Pattern analysis and insight generation
+## 📱 How to Use
 
-## 📊 Data Structure
+### 🏠 Dashboard
+- Overview of your style journey
+- Quick access to all features
+- Recent outfit activity
 
-### Outfit Entry
-```json
-{
-  "id": "unique_id",
-  "timestamp": "2024-01-15T08:30:00Z",
-  "photos": ["photo1.jpg"],
-  "tags": {
-    "occasion": ["work"],
-    "style": ["professional"],
-    "mood": "confident",
-    "colors": ["navy", "white"],
-    "season": "winter"
-  },
-  "ratings": {
-    "confidence": 8,
-    "comfort": 9,
-    "success": 8
-  }
-}
-```
+### 📸 Upload Outfit
+1. Tap "Upload Outfit"
+2. Select/take a photo
+3. Tag with occasion, style, and mood
+4. Add optional notes
+5. Submit to your lookbook
 
-### Wardrobe Item
-```json
-{
-  "id": "item_id",
-  "name": "Navy Blazer",
-  "category": "outerwear",
-  "colors": ["navy"],
-  "styleTags": ["professional", "classic"],
-  "wornCount": 12,
-  "costPerWear": 8.33
-}
-```
+### 🤖 AI Chat
+1. Tap "Chat" to open AI assistant
+2. Ask for style advice, outfit suggestions, or fashion tips
+3. AI can see your uploaded outfits for personalized advice
+4. Get real-time recommendations
 
-## 🎯 Use Cases
+### 📋 Occasion Planner
+1. Select date and occasion
+2. Choose weather conditions
+3. Get AI-powered outfit suggestions
+4. Based on your personal style and wardrobe
 
-### Daily Workflow
-1. **Morning**: Get weather-appropriate outfit recommendations
-2. **Logging**: Capture outfit photo with quick tags
-3. **Evening**: Rate the outfit's performance
-4. **Weekly**: Review patterns and insights
-
-### Style Development
-- Track confidence trends over time
-- Identify most successful outfit formulas
-- Discover wardrobe gaps and optimization opportunities
-- Experiment with new styles while maintaining what works
-
-### Wardrobe Optimization
-- Calculate cost-per-wear for clothing investments
-- Identify underutilized items
-- Plan strategic purchases to fill gaps
-- Track seasonal wardrobe needs
+### 👗 Lookbook
+- Browse all your uploaded outfits
+- Organized by date
+- Tap any outfit to view details
+- See tags and notes you added
 
 ## 🔧 Configuration
 
-Edit `config/default.json` to customize:
-
+### PWA Settings
+Edit `web-interface/manifest.json`:
 ```json
 {
-  "ai": {
-    "provider": "openai",
-    "model": "gpt-4-vision-preview"
-  },
-  "recommendations": {
-    "maxSuggestions": 5,
-    "weatherApiEnabled": true
-  },
-  "privacy": {
-    "localProcessingOnly": false,
-    "encryptSensitiveData": true
-  }
+  "name": "Your App Name",
+  "short_name": "YourApp",
+  "theme_color": "#8b2635",
+  "background_color": "#FFFFFF"
 }
+```
+
+### Service Worker Cache
+Edit `web-interface/sw.js` to modify caching strategy:
+```javascript
+const CACHE_NAME = 'stylisti-v13';
+const urlsToCache = [
+  '/app.html',
+  '/manifest.json',
+  // Add more assets
+];
 ```
 
 ## 🔐 Privacy & Security
 
-- **Local-first**: Data stored locally by default
-- **Encryption**: Sensitive data encrypted at rest
-- **Export Control**: Full data portability
-- **AI Processing**: Optional cloud processing with consent
+- ✅ **Firebase Security**: Photos stored securely in Firebase Storage
+- ✅ **Anonymous Auth**: No personal data collection required
+- ✅ **HTTPS**: All traffic encrypted
+- ✅ **Environment Variables**: API keys stored securely
+- ✅ **Client-Side Processing**: Most processing happens in browser
 
-## 📈 Analytics & Insights
+## 📊 Features in Detail
 
-### Available Reports
-- Monthly style summaries
-- Confidence trend analysis
-- Color palette optimization
-- Wardrobe efficiency metrics
-- Cost-per-wear analysis
+### AI Assistant Capabilities
+- **Style Analysis**: AI analyzes your outfits and provides feedback
+- **Weather Recommendations**: Suggests appropriate clothing for weather
+- **Color Coordination**: Helps with color matching and combinations
+- **Occasion Matching**: Recommends outfits for specific events
+- **Personal Style Evolution**: Tracks your style journey over time
 
-### Pattern Recognition
-- Weather-outfit correlations
-- Occasion-specific success patterns
-- Color combination effectiveness
-- Style evolution tracking
+### PWA Benefits
+- **Offline Access**: Works without internet connection
+- **Home Screen Install**: Native app experience
+- **Push Notifications**: Stay updated with style tips
+- **Fast Loading**: Cached assets for instant loading
+- **Mobile Optimized**: Perfect touch experience
 
-## 🛠️ Development
+## 🎯 Roadmap
 
+<<<<<<< HEAD
 ### Setup Development Environment
 ```bash
 npm install
@@ -241,19 +224,44 @@ src/
 ├── tools/              # MCP tool definitions
 └── types/              # TypeScript definitions
 ```
+=======
+- [ ] **Outfit Sharing**: Share looks with friends
+- [ ] **Style Analytics**: Detailed insights into your style patterns
+- [ ] **Shopping Assistant**: AI-powered shopping recommendations
+- [ ] **Wardrobe Planner**: Plan outfits for the week
+- [ ] **Style Challenges**: Gamify your style journey
+- [ ] **Social Features**: Connect with other fashion enthusiasts
+>>>>>>> bfaa6f1 (Update README to reflect current PWA architecture)
 
 ## 🤝 Contributing
 
 1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests
-5. Submit a pull request
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
 ## 📄 License
 
-MIT License - see [LICENSE](LICENSE) for details.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
+<<<<<<< HEAD
 ---
 
 *Stylisti - Bringing AI-powered insights to your personal style journey*
+=======
+## 👩‍💻 Author
+
+**Srusti Sain** - [GitHub](https://github.com/srustisain)
+
+## 🙏 Acknowledgments
+
+- **OpenAI** for GPT-4 Vision API
+- **Firebase** for cloud storage
+- **Vercel** for seamless deployment
+- **Progressive Web App** standards
+
+---
+
+*Stylisti - Your AI-powered style companion, always in your pocket! 📱✨*
+>>>>>>> bfaa6f1 (Update README to reflect current PWA architecture)
