@@ -145,7 +145,163 @@ const upload = multer({
 
 // Middleware
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 app.use(express.static(__dirname));
+
+// OTP storage (in production, use Redis or database)
+const otpStore = new Map();
+
+// Auth middleware for OTP
+function requireAuth(req, res, next) {
+  const authCookie = req.headers.cookie?.includes('stylisti-auth=verified');
+  const isAuthPage = req.path === '/login' || req.path === '/send-otp' || req.path === '/verify-otp';
+  
+  if (!authCookie && !isAuthPage) {
+    return res.redirect('/login');
+  }
+  
+  next();
+}
+
+// Generate 6-digit OTP
+function generateOTP() {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+}
+
+// Send email function (using a simple email service)
+async function sendOTP(email, otp) {
+  // For now, we'll use a simple console log
+  // In production, use SendGrid, Nodemailer, or similar service
+  console.log(`📧 OTP for ${email}: ${otp}`);
+  
+  // You can integrate with an email service here
+  // For testing, the OTP will be shown in the server logs
+  return true;
+}
+
+// Login page
+app.get('/login', (req, res) => {
+  const error = req.query.error;
+  const sent = req.query.sent;
+  
+  res.send(`
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Stylisti - Magic Link Access</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, #8b2635 0%, #a53860 100%);
+            display: flex; align-items: center; justify-content: center;
+            min-height: 100vh; margin: 0; color: white;
+        }
+        .container { 
+            background: white; color: #333; padding: 40px; border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3); max-width: 400px; width: 90%;
+            text-align: center;
+        }
+        .icon { font-size: 48px; margin-bottom: 20px; }
+        h1 { margin: 0 0 10px; color: #8b2635; font-size: 32px; }
+        p { color: #666; margin-bottom: 30px; font-size: 16px; }
+        input { 
+            width: 100%; padding: 15px; border: 1px solid #ddd; border-radius: 10px;
+            font-size: 16px; margin-bottom: 20px; box-sizing: border-box;
+        }
+        button { 
+            width: 100%; padding: 15px; background: #8b2635; color: white;
+            border: none; border-radius: 10px; font-size: 16px; cursor: pointer;
+            font-weight: 600; margin-bottom: 10px;
+        }
+        button:hover { background: #a53860; }
+        .error { color: #e74c3c; margin-bottom: 20px; font-size: 14px; }
+        .success { color: #27ae60; margin-bottom: 20px; font-size: 14px; }
+        .step { display: none; }
+        .step.active { display: block; }
+        .otp-input { 
+            font-size: 24px; text-align: center; letter-spacing: 8px;
+            font-family: monospace; font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="icon">👗</div>
+        <h1>Stylisti</h1>
+        <p>Srusti's Personal AI Style Assistant</p>
+        
+        <div id="step1" class="step ${sent ? '' : 'active'}">
+            ${error === 'email' ? '<div class="error">❌ Invalid email address!</div>' : ''}
+            <p>Enter your email to receive a magic code:</p>
+            <form method="POST" action="/send-otp">
+                <input type="email" name="email" placeholder="sainsrusti@gmail.com" required>
+                <button type="submit">Send Magic Code</button>
+            </form>
+        </div>
+        
+        <div id="step2" class="step ${sent ? 'active' : ''}">
+            ${error === 'otp' ? '<div class="error">❌ Invalid or expired code!</div>' : ''}
+            ${sent ? '<div class="success">✅ Magic code sent to your email!</div>' : ''}
+            <p>Enter the 6-digit code from your email:</p>
+            <form method="POST" action="/verify-otp">
+                <input type="text" name="otp" placeholder="123456" maxlength="6" class="otp-input" required>
+                <button type="submit">Verify & Access App</button>
+                <button type="button" onclick="window.location.href='/login'">Send New Code</button>
+            </form>
+        </div>
+        
+        <p style="font-size: 12px; color: #999; margin-top: 20px;">🔒 Private access only</p>
+    </div>
+</body>
+</html>
+  `);
+});
+
+// Send OTP
+app.post('/send-otp', async (req, res) => {
+  const email = req.body.email;
+  const allowedEmail = 'sainsrusti@gmail.com';
+  
+  if (email !== allowedEmail) {
+    return res.redirect('/login?error=email');
+  }
+  
+  const otp = generateOTP();
+  const expiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes
+  
+  // Store OTP
+  otpStore.set(email, { otp, expiresAt });
+  
+  // Send OTP via email
+  await sendOTP(email, otp);
+  
+  res.redirect('/login?sent=1');
+});
+
+// Verify OTP
+app.post('/verify-otp', (req, res) => {
+  const otp = req.body.otp;
+  const email = 'sainsrusti@gmail.com';
+  
+  const storedData = otpStore.get(email);
+  
+  if (!storedData || storedData.expiresAt < Date.now() || storedData.otp !== otp) {
+    return res.redirect('/login?error=otp');
+  }
+  
+  // OTP is valid, set auth cookie
+  res.cookie('stylisti-auth', 'verified', { 
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production'
+  });
+  
+  // Clean up used OTP
+  otpStore.delete(email);
+  
+  res.redirect('/');
+});
 
 // PWA manifest route
 app.get('/manifest.json', (req, res) => {
@@ -328,7 +484,7 @@ app.get('/old-upload', (req, res) => {
   res.sendFile(path.resolve(__dirname, 'index.html'));
 });
 
-app.post('/upload-outfit', upload.array('photos'), async (req, res) => {
+app.post('/upload-outfit', requireAuth, upload.array('photos'), async (req, res) => {
   try {
     const { body, files } = req;
     
@@ -469,7 +625,7 @@ app.get('/health', (req, res) => {
 });
 
 // Serve the main app HTML
-app.get('/', (req, res) => {
+app.get('/', requireAuth, (req, res) => {
   res.sendFile(path.join(__dirname, 'app.html'));
 });
 
@@ -577,7 +733,7 @@ app.get('/api/photos', async (req, res) => {
 });
 
 // Real AI Chat endpoint with GPT-4 Vision
-app.post('/api/chat', async (req, res) => {
+app.post('/api/chat', requireAuth, async (req, res) => {
   try {
     const { message, sessionId = 'default' } = req.body;
     
