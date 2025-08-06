@@ -242,14 +242,6 @@ src/
 └── types/              # TypeScript definitions
 ```
 
-## 📚 Documentation
-
-- [Design Document](STYLE_MCP_DESIGN.md) - Complete system design
-- [Implementation Guide](MCP_IMPLEMENTATION_GUIDE.md) - Technical details
-- [App Options Guide](APP_OPTIONS.md) - Privacy & ease comparison
-- [API Reference](docs/api.md) - Tool specifications
-- [User Guide](docs/user-guide.md) - Usage examples
-
 ## 🤝 Contributing
 
 1. Fork the repository
@@ -262,15 +254,6 @@ src/
 
 MIT License - see [LICENSE](LICENSE) for details.
 
-## 🔮 Future Enhancements
-
-- [ ] Mobile app integration
-- [ ] Social style sharing
-- [ ] Shopping assistant integration
-- [ ] Advanced computer vision
-- [ ] Trend prediction algorithms
-- [ ] Sustainable fashion metrics
-
 ---
 
-*Style MCP - Bringing AI-powered insights to your personal style journey*
+*Stylisti - Bringing AI-powered insights to your personal style journey*
