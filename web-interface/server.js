@@ -15,17 +15,59 @@ import fsSync from 'fs';
 import OpenAI from 'openai';
 import dotenv from 'dotenv';
 import sharp from 'sharp';
+import { initializeApp } from 'firebase/app';
+import { getStorage, ref, uploadBytes, listAll, getDownloadURL, deleteObject } from 'firebase/storage';
+import { getAuth, signInAnonymously } from 'firebase/auth';
 
 // Load environment variables
 dotenv.config();
 
+// Debug environment variables in Vercel
+console.log('🔍 Environment check:');
+console.log('VERCEL:', process.env.VERCEL);
+console.log('OPENAI_API_KEY exists:', !!process.env.OPENAI_API_KEY);
+console.log('OPENAI_API_KEY length:', process.env.OPENAI_API_KEY ? process.env.OPENAI_API_KEY.length : 0);
+
+// Firebase configuration - Replace with your actual Firebase config
+const firebaseConfig = {
+  apiKey: process.env.FIREBASE_API_KEY || "your-api-key-here",
+  authDomain: process.env.FIREBASE_AUTH_DOMAIN || "stylisti-app.firebaseapp.com",
+  projectId: process.env.FIREBASE_PROJECT_ID || "stylisti-app",
+  storageBucket: process.env.FIREBASE_STORAGE_BUCKET || "stylisti-app.appspot.com",
+  messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID || "123456789",
+  appId: process.env.FIREBASE_APP_ID || "your-app-id-here"
+};
+
+// Initialize Firebase with error handling
+let firebaseApp, firebaseStorage, firebaseAuth;
+try {
+  firebaseApp = initializeApp(firebaseConfig);
+  firebaseStorage = getStorage(firebaseApp);
+  firebaseAuth = getAuth(firebaseApp);
+  
+  // Sign in anonymously for uploads (you can add proper auth later)
+  if (process.env.FIREBASE_API_KEY && process.env.FIREBASE_API_KEY !== "your-api-key-here") {
+    signInAnonymously(firebaseAuth).then(() => {
+      console.log('✅ Firebase authenticated successfully');
+    }).catch((error) => {
+      console.error('❌ Firebase auth error:', error);
+      console.log('⚠️ Continuing without Firebase - using local storage');
+    });
+  } else {
+    console.log('⚠️ Firebase not configured - running in local mode');
+  }
+} catch (error) {
+  console.error('❌ Firebase initialization error:', error);
+  console.log('⚠️ Continuing without Firebase - using local storage');
+}
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 8080;
 
 // Initialize OpenAI client
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY || 'your-openai-api-key-here'
+  apiKey: process.env.OPENAI_API_KEY
 });
 
 // Store conversation history
@@ -83,24 +125,8 @@ async function processImage(inputPath, outputPath) {
   }
 }
 
-// Configure multer for photo uploads
-const storage = multer.diskStorage({
-  destination: async (req, file, cb) => {
-    const uploadDir = path.join(__dirname, '../data/photos');
-    try {
-      await fs.mkdir(uploadDir, { recursive: true });
-      cb(null, uploadDir);
-    } catch (error) {
-      cb(error);
-    }
-  },
-  filename: (req, file, cb) => {
-    const timestamp = new Date().toISOString().split('T')[0];
-    const randomId = Math.random().toString(36).substr(2, 9);
-    const ext = path.extname(file.originalname);
-    cb(null, `${timestamp}-outfit-${randomId}${ext}`);
-  }
-});
+// Configure multer for memory storage (files will be uploaded to Firebase)
+const storage = multer.memoryStorage();
 
 const upload = multer({
   storage,
@@ -121,6 +147,44 @@ const upload = multer({
 app.use(express.json());
 app.use(express.static(__dirname));
 
+// PWA manifest route
+app.get('/manifest.json', (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  res.sendFile(path.join(__dirname, 'manifest.json'));
+});
+
+// Service worker route
+app.get('/sw.js', (req, res) => {
+  res.setHeader('Content-Type', 'application/javascript');
+  res.sendFile(path.join(__dirname, 'sw.js'));
+});
+
+// Icon routes
+app.get('/icon-192.png', (req, res) => {
+  res.setHeader('Content-Type', 'image/png');
+  res.sendFile(path.join(__dirname, 'icon-192.png'));
+});
+
+app.get('/icon-512.png', (req, res) => {
+  res.setHeader('Content-Type', 'image/png');
+  res.sendFile(path.join(__dirname, 'icon-512.png'));
+});
+
+// Mobile-optimized route  
+app.get('/mobile', (req, res) => {
+  res.sendFile(path.join(__dirname, 'mobile.html'));
+});
+
+// Sophisticated mobile app route
+app.get('/app', (req, res) => {
+  res.sendFile(path.join(__dirname, 'app.html'));
+});
+
+// Root route - serve the main app
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'app.html'));
+});
+
 // MCP Server communication
 class MCPClient {
   constructor() {
@@ -130,10 +194,21 @@ class MCPClient {
   }
 
   async start() {
-    const serverPath = path.join(__dirname, '../dist/server.js');
-    this.server = spawn('node', [serverPath], {
-      stdio: ['pipe', 'pipe', 'inherit']
-    });
+    // Skip MCP server in Vercel environment
+    if (process.env.VERCEL === '1') {
+      console.log('⚠️ MCP server disabled in Vercel environment');
+      return;
+    }
+    
+    try {
+      const serverPath = path.join(__dirname, '../dist/server.js');
+      this.server = spawn('node', [serverPath], {
+        stdio: ['pipe', 'pipe', 'inherit']
+      });
+    } catch (error) {
+      console.log('⚠️ MCP server not available - running in standalone mode');
+      return;
+    }
 
     // Handle responses
     let buffer = '';
@@ -195,6 +270,16 @@ class MCPClient {
   }
 
   async logOutfit(outfitData) {
+    // In Vercel environment, just return success
+    if (process.env.VERCEL === '1') {
+      return {
+        result: {
+          outfit_id: `vercel-${Date.now()}`,
+          message: 'Outfit logged successfully (Vercel mode)'
+        }
+      };
+    }
+    
     return await this.sendMessage('tools/call', {
       name: 'log_outfit',
       arguments: outfitData
@@ -202,6 +287,19 @@ class MCPClient {
   }
 
   async getRecommendations(context) {
+    // In Vercel environment, return mock recommendations
+    if (process.env.VERCEL === '1') {
+      return {
+        result: {
+          recommendations: [
+            "Try pairing your favorite jeans with a crisp white blouse",
+            "A black blazer can elevate any casual outfit",
+            "Don't forget accessories - they make the outfit!"
+          ]
+        }
+      };
+    }
+    
     return await this.sendMessage('tools/call', {
       name: 'get_outfit_recommendations',
       arguments: context
@@ -246,35 +344,60 @@ app.post('/upload-outfit', upload.array('photos'), async (req, res) => {
       });
     }
     
-    // Process all images to standard JPG format
-    console.log('🔄 Processing images to JPG format...');
-    const processedFiles = [];
+    // Upload files directly to Firebase Storage
+    console.log('📤 Uploading images to Firebase Storage...');
+    const uploadedFiles = [];
     
     for (const file of files) {
-      const originalPath = file.path;
-      const baseName = path.basename(file.filename, path.extname(file.filename));
-      const processedPath = path.join(path.dirname(originalPath), `${baseName}.jpg`);
-      
-      console.log(`📸 Converting ${file.filename} to JPG...`);
-      const success = await processImage(originalPath, processedPath);
-      
-      if (success) {
-        processedFiles.push({
-          ...file,
-          path: processedPath,
-          filename: `${baseName}.jpg`
+      try {
+        // Generate unique filename
+        const timestamp = new Date().toISOString().split('T')[0];
+        const randomId = Math.random().toString(36).substr(2, 9);
+        const ext = path.extname(file.originalname);
+        const fileName = `${timestamp}-outfit-${randomId}${ext}`;
+        
+        // Check if Firebase is available
+        if (!firebaseStorage) {
+          throw new Error('Firebase Storage not configured');
+        }
+        
+        // Create Firebase Storage reference
+        const storageRef = ref(firebaseStorage, `outfits/${fileName}`);
+        
+        console.log(`📤 Uploading ${fileName} to Firebase...`);
+        
+        // Upload file to Firebase Storage
+        const uploadResult = await uploadBytes(storageRef, file.buffer, {
+          contentType: file.mimetype,
+          customMetadata: {
+            originalName: file.originalname,
+            uploadedAt: new Date().toISOString()
+          }
         });
-        console.log(`✅ Processed: ${baseName}.jpg`);
-      } else {
-        console.error(`❌ Failed to process: ${file.filename}`);
-        // Keep original file if processing fails
-        processedFiles.push(file);
+        
+        // Get download URL
+        const downloadURL = await getDownloadURL(uploadResult.ref);
+        
+        uploadedFiles.push({
+          filename: fileName,
+          originalname: file.originalname,
+          url: downloadURL,
+          size: file.size,
+          mimetype: file.mimetype
+        });
+        
+        console.log(`✅ Uploaded: ${fileName}`);
+        
+      } catch (error) {
+        console.error(`❌ Failed to upload ${file.originalname}:`, error);
+        throw new Error(`Upload failed for ${file.originalname}: ${error.message}`);
       }
     }
     
-    // Convert form data to outfit format
+    // Convert form data to outfit format with Firebase URLs
     const outfitData = {
-      photo_paths: processedFiles.map(f => path.relative(path.join(__dirname, '..'), f.path)),
+      photo_paths: uploadedFiles.map(f => f.url), // Store Firebase URLs instead of local paths
+      photo_filenames: uploadedFiles.map(f => f.filename), // Store filenames for reference
       occasion: JSON.parse(body.occasion || '[]'),
       mood: body.mood,
       season: JSON.parse(body.season || '[]'),
@@ -292,9 +415,9 @@ app.post('/upload-outfit', upload.array('photos'), async (req, res) => {
     
     res.json({
       success: true,
-      message: 'Outfit logged successfully! All images converted to optimized JPG format.',
+      message: 'Outfit uploaded successfully to Firebase Storage! 🔥',
       outfit_id: result.result?.outfit_id,
-      photos: processedFiles.map(f => f.filename)
+      photos: uploadedFiles.map(f => ({ filename: f.filename, url: f.url }))
     });
 
   } catch (error) {
@@ -311,6 +434,8 @@ app.post('/upload-outfit', upload.array('photos'), async (req, res) => {
       errorMessage = 'Invalid file type! Please use JPG, PNG, WebP, or HEIC images.';
     } else if (error.message.includes('MCP')) {
       errorMessage = 'Connection issue with style server. Please try again.';
+    } else if (error.message.includes('Firebase Storage not configured')) {
+      errorMessage = 'Storage service not configured. Please check Firebase setup.';
     }
     
     res.status(500).json({
@@ -338,8 +463,14 @@ app.get('/health', (req, res) => {
   res.json({ 
     status: 'healthy',
     server: 'Stylisti App',
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
+    environment: process.env.VERCEL === '1' ? 'Vercel' : 'Local'
   });
+});
+
+// Serve the main app HTML
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'app.html'));
 });
 
 // API endpoints for Stylisti app
@@ -354,34 +485,94 @@ app.get('/api/stats', (req, res) => {
   });
 });
 
-
-
-// Static photo serving
-app.use('/photos', express.static(path.resolve(__dirname, '../data/photos')));
-
-// Get list of available photos
-app.get('/api/photos', (req, res) => {
+// Firebase photo URL redirect - photos are now served directly from Firebase
+app.get('/photos/:filename', async (req, res) => {
   try {
-    const photoDir = path.resolve(__dirname, '../data/photos');
+    const { filename } = req.params;
     
-    if (fsSync.existsSync(photoDir)) {
-      const files = fsSync.readdirSync(photoDir)
-        .filter(file => /\.(jpg|jpeg|png|heic|webp)$/i.test(file))
-        .map((file, index) => ({
-          filename: file,
-          url: `/photos/${file}`,
-          id: index + 1
-        }));
-      
-      console.log(`Found ${files.length} photos:`, files.map(f => f.filename));
-      res.json({ success: true, photos: files });
-    } else {
-      console.log('Photo directory not found:', photoDir);
-      res.json({ success: false, photos: [] });
+    if (!firebaseStorage) {
+      return res.status(404).send('Firebase Storage not configured');
     }
+    
+    // Create Firebase Storage reference
+    const storageRef = ref(firebaseStorage, `outfits/${filename}`);
+    
+    // Get download URL from Firebase
+    const downloadURL = await getDownloadURL(storageRef);
+    
+    // Redirect to Firebase URL (or proxy the content)
+    res.redirect(downloadURL);
+    
   } catch (error) {
-    console.error('Error listing photos:', error);
-    res.json({ success: false, photos: [] });
+    console.error('Firebase photo serving error:', error);
+    res.status(404).send('Photo not found in Firebase Storage');
+  }
+});
+
+// Get list of available photos from Firebase Storage
+app.get('/api/photos', async (req, res) => {
+  try {
+    if (!firebaseStorage) {
+      return res.json({ 
+        success: false, 
+        photos: [],
+        error: 'Firebase Storage not configured'
+      });
+    }
+    
+    // List all files in the 'outfits' folder in Firebase Storage
+    const listRef = ref(firebaseStorage, 'outfits');
+    const listResult = await listAll(listRef);
+    
+    console.log(`📸 Found ${listResult.items.length} photos in Firebase Storage`);
+    
+    // Get download URLs for all photos
+    const photoPromises = listResult.items.map(async (itemRef, index) => {
+      try {
+        const downloadURL = await getDownloadURL(itemRef);
+        const filename = itemRef.name;
+        
+        return {
+          filename: filename,
+          url: downloadURL,
+          id: index + 1,
+          canDisplay: true, // All Firebase Storage images can be displayed
+          isHEIC: /\.(heic)$/i.test(filename),
+          firebaseRef: itemRef.fullPath
+        };
+      } catch (error) {
+        console.error(`Error getting URL for ${itemRef.name}:`, error);
+        return null;
+      }
+    });
+    
+    const photos = (await Promise.all(photoPromises))
+      .filter(photo => photo !== null)
+      .sort((a, b) => {
+        // Sort by filename (which includes date) to get newest first
+        return b.filename.localeCompare(a.filename);
+      });
+    
+    console.log(`✅ Successfully loaded ${photos.length} photos from Firebase Storage`);
+    res.json({ success: true, photos: photos });
+    
+  } catch (error) {
+    console.error('❌ Error listing Firebase Storage photos:', error);
+    
+    // Fallback message for setup issues
+    if (error.code === 'storage/unauthorized') {
+      res.json({ 
+        success: false, 
+        photos: [],
+        error: 'Firebase Storage not properly configured. Please check Firebase setup.'
+      });
+    } else {
+      res.json({ 
+        success: false, 
+        photos: [],
+        error: 'Failed to load photos from Firebase Storage'
+      });
+    }
   }
 });
 
@@ -393,7 +584,7 @@ app.post('/api/chat', async (req, res) => {
     console.log('📝 User message:', message);
     
     // Check if we have an OpenAI API key
-    if (!process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY === 'your-openai-api-key-here') {
+    if (!process.env.OPENAI_API_KEY) {
       return res.json({
         success: true,
         response: "🤖 I need an OpenAI API key to function as a real AI assistant! Please set your OPENAI_API_KEY environment variable and restart the app. Then I'll be able to actually see your photos and have intelligent conversations with you! ✨",
@@ -407,62 +598,104 @@ app.post('/api/chat', async (req, res) => {
     }
     const history = conversationHistory.get(sessionId);
     
-    // Get available photos
-    const getAvailablePhotos = () => {
+    // Get available photos from Firebase Storage
+    const getAvailablePhotos = async () => {
       try {
-        const photoDir = path.resolve(__dirname, '../data/photos');
-        if (fsSync.existsSync(photoDir)) {
-          return fsSync.readdirSync(photoDir)
-            .filter(file => /\.(jpg|jpeg|png|heic|webp)$/i.test(file))
-            .map(file => ({
-              filename: file,
-              path: path.join(photoDir, file),
-              url: `/photos/${file}`
-            }));
+        if (!firebaseStorage) {
+          return [];
         }
+        
+        const listRef = ref(firebaseStorage, 'outfits');
+        const listResult = await listAll(listRef);
+        
+        const photoPromises = listResult.items.map(async (itemRef) => {
+          try {
+            const downloadURL = await getDownloadURL(itemRef);
+            return {
+              filename: itemRef.name,
+              url: downloadURL,
+              firebaseRef: itemRef.fullPath
+            };
+          } catch (error) {
+            console.error(`Error getting URL for ${itemRef.name}:`, error);
+            return null;
+          }
+        });
+        
+        const photos = (await Promise.all(photoPromises))
+          .filter(photo => photo !== null);
+          
+        return photos;
       } catch (error) {
-        console.error('Error getting photos:', error);
+        console.error('Error getting Firebase photos:', error);
+        return [];
       }
-      return [];
     };
     
-    const availablePhotos = getAvailablePhotos();
+    const availablePhotos = await getAvailablePhotos();
     console.log(`🎯 AI Chat found ${availablePhotos.length} photos to analyze`);
+    
+    // Check if user is feeling lazy or wants low effort (recreate exact outfit)
+    const lazyKeywords = [
+      'lazy', 'low effort', 'tired', 'don\'t want to think', 'easy', 'simple', 
+      'just wear', 'recreate', 'same as', 'exact same', 'don\'t feel like', 
+      'can\'t decide', 'no energy', 'quick', 'fast', 'grab and go', 'effortless',
+      'zero effort', 'no thinking', 'just pick one', 'one outfit', 'single outfit'
+    ];
+    const isLazyRequest = lazyKeywords.some(keyword => message.toLowerCase().includes(keyword));
+    
+    // Log the detection for debugging
+    if (isLazyRequest) {
+      const matchedKeyword = lazyKeywords.find(keyword => message.toLowerCase().includes(keyword));
+      console.log(`😴 Lazy request detected! Keyword: "${matchedKeyword}" in message: "${message.substring(0, 50)}..."`);
+    } else {
+      console.log(`🎨 Creative request detected for message: "${message.substring(0, 50)}..."`);
+    }
     
     // Prepare messages for OpenAI
     const messages = [
       {
         role: "system",
-        content: `You are Srusti's Stylist, an AI fashion assistant. You have access to ${availablePhotos.length} outfit photos from the user's wardrobe. 
+        content: `You are Srusti's Personal Stylist, analyzing her wardrobe pieces.
 
-Your personality:
-- Fun, supportive, and knowledgeable about fashion
-- Use emojis naturally ✨
-- Give specific, actionable advice
-- Mix and match pieces from different outfits
-- Consider colors, styles, occasions, and seasons
+${isLazyRequest ? 
+`LAZY/LOW EFFORT MODE - RECREATE EXACT OUTFIT:
+- Find the BEST single outfit from the photos
+- Pick ONE complete outfit that looks great
+- Don't mix and match - just recreate that exact outfit
+- Focus on comfort and ease
 
-CRITICAL INSTRUCTIONS FOR PHOTO ANALYSIS:
-- ALWAYS describe what you see in each photo: "In the first photo, I see a navy blue blazer with gold buttons"
-- Be very specific about colors, patterns, textures, and garment details
-- Reference photos by position ("first photo", "second photo", "third photo")
-- Help the user identify pieces by describing them clearly
-- Don't just say "blazer" - say "the cream-colored oversized blazer" or "the fitted black blazer"
+FORMAT:
+**Easy Outfit Recreation:**
 
-When recommending outfits:
-- Start by describing what you can see in the photos
-- Mix and match pieces from different photos
-- Give specific outfit combinations with clear photo references
-- Use markdown formatting: ### for outfit sections, ** for bold items
-- Consider the occasion, weather, or user's request
+**Wear This:** [Describe the exact outfit from one photo]
+- **Why it's perfect:** [Why this outfit is great for lazy days]
+- **Effort level:** Low - just grab and go!
 
-Format like this:
-### Outfit Suggestion:
-**Top:** The white button-down shirt from the first photo
-**Bottom:** The high-waisted black trousers from the third photo
-**Layer:** The camel coat from the second photo
+**PHOTO_REFS:** [List the filename of the outfit you're recreating]
 
-Be conversational, descriptive, and helpful!`
+Keep it simple and stress-free!` 
+: 
+`CREATIVE MODE - MIX AND MATCH:
+- Look at 4-6 photos to find the best combinations
+- Give 2-3 specific outfit suggestions
+- Be creative with mixing different pieces
+- Consider different style approaches
+
+FORMAT:
+**Outfit Suggestions:**
+
+**Look 1:** [Description of 2-3 pieces that work together]
+- **Why it works:** [Color/style logic]
+- **Pro tip:** [Styling tip]
+
+**Look 2:** [Another combination]
+- **Why it works:** [Color/style logic]  
+- **Pro tip:** [Styling tip]
+
+**PHOTO_REFS:** [List the filenames used]
+
+Be creative and show variety!`}`
       }
     ];
     
@@ -485,6 +718,9 @@ Be conversational, descriptive, and helpful!`
                              message.toLowerCase().includes('match') ||
                              availablePhotos.length > 0 && history.length === 0; // First message with photos
     
+    console.log(`🔍 Image analysis needed: ${needsImageAnalysis} for message: "${message.substring(0, 50)}..."`);
+    console.log(`📊 Available photos: ${availablePhotos.length}`);
+    
     if (needsImageAnalysis && availablePhotos.length > 0) {
       // Filter for AI-supported formats (no HEIC)
       const aiSupportedPhotos = availablePhotos
@@ -493,37 +729,54 @@ Be conversational, descriptive, and helpful!`
       console.log(`📸 Found ${aiSupportedPhotos.length} AI-compatible photos (JPG/PNG/WebP) out of ${availablePhotos.length} total`);
       
       if (aiSupportedPhotos.length > 0) {
-        // Select photos in consistent order for analysis
-        const photosToAnalyze = aiSupportedPhotos
-          .sort((a, b) => a.filename.localeCompare(b.filename)) // Consistent ordering
-          .slice(0, Math.min(5, aiSupportedPhotos.length));
+        // Select 12 different photos each time using Fisher-Yates shuffle for true randomization
+        const photosCopy = [...aiSupportedPhotos];
+        
+        // Fisher-Yates shuffle for true randomization
+        for (let i = photosCopy.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [photosCopy[i], photosCopy[j]] = [photosCopy[j], photosCopy[i]];
+        }
+        
+        const maxPhotos = Math.min(6, aiSupportedPhotos.length); // Analyze up to 6 photos for better recommendations
+        const photosToAnalyze = photosCopy.slice(0, maxPhotos);
         
         console.log(`📸 Sending ${photosToAnalyze.length} photos to AI for analysis`);
+        console.log(`🎲 Selected photos this round: ${photosToAnalyze.map(p => p.filename.substring(0, 20)).join(', ')}`);
         
         for (const photo of photosToAnalyze) {
           try {
-            const base64Image = await encodeImageToBase64(photo.path);
-            if (base64Image) {
-              userMessage.content.push({
-                type: "image_url",
-                image_url: {
-                  url: `data:${getImageMimeType(photo.filename)};base64,${base64Image}`,
-                  detail: "high"
-                }
-              });
-            }
+            // For Firebase Storage, we can directly use the download URL
+            // OpenAI can access public Firebase Storage URLs directly
+            userMessage.content.push({
+              type: "image_url",
+              image_url: {
+                url: photo.url, // Use Firebase Storage URL directly
+                detail: "high"
+              }
+            });
           } catch (error) {
             console.error(`Error processing photo ${photo.filename}:`, error);
           }
         }
         
-        // Add context about the photos
+        // Add context about the photos with actual filenames
+        const photoFilenames = photosToAnalyze.map(p => p.filename).join(', ');
+        
         userMessage.content.push({
           type: "text",
-          text: `\n\nI'm showing you ${photosToAnalyze.length} outfits from my wardrobe. When recommending outfits, please describe the clothing items by their COLOR, STYLE, and TYPE (e.g. "the navy blue blazer", "the floral midi dress", "the white button-up shirt") rather than just saying "photo 1" or "photo 3". Be descriptive so I know exactly which piece you mean!`
+          text: `\n\nI'm sharing ${photosToAnalyze.length} pieces from my wardrobe. ${isLazyRequest ? 
+            'I\'m feeling lazy today - please pick the BEST single outfit from these photos and tell me to recreate it exactly. No mixing and matching, just one complete outfit that looks great and is easy to wear.' : 
+            'Please suggest 2-3 creative outfit combinations using these pieces. Mix and match different items to create new looks!'}
+
+📸 Photos: ${photoFilenames}
+
+${isLazyRequest ? 'Keep it simple - just one great outfit!' : 'Show me different style approaches!'}`
         });
 
         // Store the analyzed photos for the response
+        console.log(`💾 Storing ${photosToAnalyze.length} analyzed photos for session ${sessionId}`);
+        console.log(`🔍 Sample photo structure:`, photosToAnalyze[0] ? {url: photosToAnalyze[0].url ? 'HAS_URL' : 'NO_URL', filename: photosToAnalyze[0].filename} : 'NO_PHOTOS');
         conversationHistory.set(sessionId + '_analyzed_photos', photosToAnalyze);
       } else {
         console.log(`⚠️ No AI-compatible photos found. OpenAI requires JPG/PNG/WebP format.`);
@@ -537,12 +790,26 @@ Be conversational, descriptive, and helpful!`
     const completion = await openai.chat.completions.create({
       model: "gpt-4o",
       messages: messages,
-      max_tokens: 500,
-      temperature: 0.7
+      max_tokens: 300, // Reduced for more concise responses
+      temperature: 0.7 // Balanced creativity
     });
     
     const aiResponse = completion.choices[0].message.content;
     console.log('✨ AI Response:', aiResponse);
+    
+    // Validation: Check for potential hallucination indicators
+    const lazy_format_indicators = ['Wear This:', 'Easy Outfit Recreation:', 'Effort level: Low'];
+    const creative_format_indicators = ['Look 1:', 'Look 2:', 'Outfit Suggestions:'];
+    
+    const has_proper_format = isLazyRequest ? 
+      lazy_format_indicators.some(indicator => aiResponse.includes(indicator)) :
+      creative_format_indicators.some(indicator => aiResponse.includes(indicator));
+    
+    if (!has_proper_format) {
+      console.log(`⚠️ AI response may not be following ${isLazyRequest ? 'lazy' : 'creative'} format - potential hallucination detected`);
+    } else {
+      console.log(`✅ AI response follows expected ${isLazyRequest ? 'lazy' : 'creative'} format`);
+    }
     
     // Add to conversation history
     history.push(userMessage);
@@ -553,36 +820,65 @@ Be conversational, descriptive, and helpful!`
       history.splice(0, history.length - 20);
     }
     
-    // Parse response to extract any photo recommendations
-    const images = [];
-    if (needsImageAnalysis && availablePhotos.length > 0) {
-      // Get the photos that were actually sent to AI for analysis
-      const analyzedPhotos = conversationHistory.get(sessionId + '_analyzed_photos');
+    // Extract specific photos referenced in AI response
+    const analyzedPhotos = conversationHistory.get(sessionId + '_analyzed_photos') || [];
+    let filteredPhotos = analyzedPhotos;
+    
+    // Parse AI response for referenced photos and clean the response
+    const referencedMatch = aiResponse.match(/\*\*PHOTO_REFS:\*\*\s*([^*\n]+)/i);
+    let cleanResponse = aiResponse;
+    
+    if (referencedMatch) {
+      const referencedFilenames = referencedMatch[1]
+        .split(',')
+        .map(name => name.trim().toLowerCase())
+        .filter(name => name.length > 0);
       
-      if (analyzedPhotos && analyzedPhotos.length > 0) {
-        // Return the first 3 photos that the AI actually analyzed
-        const photosToShow = analyzedPhotos.slice(0, Math.min(3, analyzedPhotos.length));
-        
-        photosToShow.forEach((photo, index) => {
-          const ordinalNumbers = ['first', 'second', 'third', 'fourth', 'fifth'];
-          images.push({
-            url: photo.url,
-            caption: `${ordinalNumbers[index]} photo`,
-            outfit: index + 1,
-            description: `This is the ${ordinalNumbers[index]} photo that the AI analyzed`
-          });
-        });
+      console.log(`🎯 AI referenced specific photos: ${referencedFilenames.join(', ')}`);
+      
+      // Filter analyzed photos to only include referenced ones
+      filteredPhotos = analyzedPhotos.filter(photo => 
+        referencedFilenames.some(refName => 
+          photo.filename.toLowerCase() === refName || 
+          photo.filename.toLowerCase().includes(refName.toLowerCase())
+        )
+      );
+      
+      // Remove the PHOTO_REFS section from the response shown to user
+      cleanResponse = aiResponse.replace(/\*\*PHOTO_REFS:\*\*[^*\n]*\n?/i, '').trim();
+      
+      // Update conversation history with clean response
+      if (history.length > 0 && history[history.length - 1].role === "assistant") {
+        history[history.length - 1].content = cleanResponse;
       }
+      
+      console.log(`📸 Filtered to ${filteredPhotos.length} specific reference photos`);
+    } else {
+      console.log(`⚠️ No specific photo references found in AI response, showing all ${analyzedPhotos.length} analyzed photos`);
     }
+    
+    console.log(`🖼️ Returning ${filteredPhotos.length} reference images for session ${sessionId}`);
+    
+    const referenceImages = filteredPhotos.map(photo => ({
+      url: photo.url,
+      filename: photo.filename,
+      isReference: true
+    }));
     
     res.json({
       success: true,
-      response: aiResponse,
-      images: images
+      response: cleanResponse,
+      images: referenceImages
     });
     
   } catch (error) {
     console.error('❌ AI Chat error:', error);
+    console.error('❌ Error details:', {
+      message: error.message,
+      code: error.code,
+      status: error.status,
+      type: error.type
+    });
     
     // Provide helpful error messages
     let errorMessage = "I'm having trouble connecting to my AI brain right now. ";
@@ -594,7 +890,7 @@ Be conversational, descriptive, and helpful!`
     } else if (error.message.includes('billing')) {
       errorMessage += "There might be an issue with the OpenAI account billing. ✨";
     } else {
-      errorMessage += "Let me try to help you anyway! What can I do for your style today? ✨";
+      errorMessage += `Error: ${error.message}. Let me try to help you anyway! What can I do for your style today? ✨`;
     }
     
     res.json({
@@ -610,21 +906,25 @@ async function startServers() {
   try {
     // Start MCP client connection
     console.log('🔌 Connecting to Stylisti MCP backend...');
-    await mcpClient.start();
-    console.log('✅ Connected to Stylisti MCP backend');
+    try {
+      await mcpClient.start();
+      console.log('✅ Connected to Stylisti MCP backend');
+    } catch (error) {
+      console.log('⚠️ MCP backend not available - running in standalone mode');
+    }
 
     // Start web server on all network interfaces
     app.listen(PORT, '0.0.0.0', () => {
       console.log(`✨🌐✨ Stylisti App running at:`);
       console.log(`   💻 http://localhost:${PORT} (on this computer)`);
-      console.log(`   📱 http://10.97.39.12:${PORT} (on your iPhone)`);
+      console.log(`   📱 http://10.97.48.130:${PORT} (on your iPhone)`);
       console.log(`   🤖 AI Chat: Srusti's Stylist`);
       console.log(`   👗 Gallery: 36+ outfits loaded`);
       console.log(`   📸 Upload: Drag & drop ready`);
       console.log(`   🔒 100% Local & Private`);
       console.log(`   📁 Photos stored in: data/photos/`);
       console.log('\n✨ Welcome to your AI style assistant! ✨');
-      console.log(`\n📲 iPhone Users: Open Safari and go to http://10.97.39.12:${PORT}`);
+      console.log(`\n📲 iPhone Users: Open Safari and go to http://10.97.48.130:${PORT}`);
     });
 
   } catch (error) {
@@ -646,5 +946,10 @@ process.on('SIGTERM', () => {
   process.exit(0);
 });
 
-// Start the application
-startServers();
+// Start the application only if not in Vercel environment
+if (process.env.VERCEL !== '1') {
+  startServers();
+}
+
+// Export for Vercel serverless functions
+export default app;

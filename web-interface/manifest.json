@@ -5,8 +5,8 @@
   "start_url": "/",
   "display": "standalone",
   "background_color": "#FFFFFF",
-  "theme_color": "#800020",
-  "orientation": "portrait-primary",
+  "theme_color": "#8b2635",
+  "orientation": "portrait",
   "categories": ["lifestyle", "fashion", "productivity"],
   "icons": [
     {
@@ -20,14 +20,6 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
-    }
-  ],
-  "screenshots": [
-    {
-      "src": "screenshot-mobile.png",
-      "sizes": "390x844",
-      "type": "image/png",
-      "form_factor": "narrow"
     }
   ]
 }

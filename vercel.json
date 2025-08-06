@@ -1,0 +1,59 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "web-interface/server.js",
+      "use": "@vercel/node"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "/web-interface/server.js"
+    },
+    {
+      "src": "/upload-outfit",
+      "dest": "/web-interface/server.js"
+    },
+    {
+      "src": "/photos/(.*)",
+      "dest": "/web-interface/server.js"
+    },
+    {
+      "src": "/health",
+      "dest": "/web-interface/server.js"
+    },
+    {
+      "src": "/chat",
+      "dest": "/web-interface/server.js"
+    },
+    {
+      "src": "/get-recommendations",
+      "dest": "/web-interface/server.js"
+    },
+    {
+      "src": "/manifest.json",
+      "dest": "/web-interface/server.js"
+    },
+    {
+      "src": "/sw.js",
+      "dest": "/web-interface/server.js"
+    },
+    {
+      "src": "/icon-192.png",
+      "dest": "/web-interface/server.js"
+    },
+    {
+      "src": "/icon-512.png",
+      "dest": "/web-interface/server.js"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/web-interface/server.js"
+    }
+  ],
+  "env": {
+    "NODE_ENV": "production",
+    "VERCEL": "1"
+  }
+}
