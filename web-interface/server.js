@@ -148,13 +148,10 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(__dirname));
 
-// OTP storage (in production, use Redis or database)
-const otpStore = new Map();
-
-// Auth middleware for OTP
+// Auth middleware for password
 function requireAuth(req, res, next) {
   const authCookie = req.headers.cookie?.includes('stylisti-auth=verified');
-  const isAuthPage = req.path === '/login' || req.path === '/send-otp' || req.path === '/verify-otp';
+  const isAuthPage = req.path === '/login' || req.path === '/verify-password';
   
   if (!authCookie && !isAuthPage) {
     return res.redirect('/login');
@@ -163,32 +160,15 @@ function requireAuth(req, res, next) {
   next();
 }
 
-// Generate 6-digit OTP
-function generateOTP() {
-  return Math.floor(100000 + Math.random() * 900000).toString();
-}
-
-// Send email function (using a simple email service)
-async function sendOTP(email, otp) {
-  // For now, we'll use a simple console log
-  // In production, use SendGrid, Nodemailer, or similar service
-  console.log(`📧 OTP for ${email}: ${otp}`);
-  
-  // You can integrate with an email service here
-  // For testing, the OTP will be shown in the server logs
-  return true;
-}
-
 // Login page
 app.get('/login', (req, res) => {
   const error = req.query.error;
-  const sent = req.query.sent;
   
   res.send(`
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Stylisti - Magic Link Access</title>
+    <title>Stylisti - Password Access</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
         body { 
@@ -216,11 +196,8 @@ app.get('/login', (req, res) => {
         }
         button:hover { background: #a53860; }
         .error { color: #e74c3c; margin-bottom: 20px; font-size: 14px; }
-        .success { color: #27ae60; margin-bottom: 20px; font-size: 14px; }
-        .step { display: none; }
-        .step.active { display: block; }
-        .otp-input { 
-            font-size: 24px; text-align: center; letter-spacing: 8px;
+        .password-input { 
+            font-size: 18px; text-align: center; letter-spacing: 2px;
             font-family: monospace; font-weight: bold;
         }
     </style>
@@ -231,25 +208,12 @@ app.get('/login', (req, res) => {
         <h1>Stylisti</h1>
         <p>Srusti's Personal AI Style Assistant</p>
         
-        <div id="step1" class="step ${sent ? '' : 'active'}">
-            ${error === 'email' ? '<div class="error">❌ Invalid email address!</div>' : ''}
-            <p>Enter your email to receive a magic code:</p>
-            <form method="POST" action="/send-otp">
-                <input type="email" name="email" placeholder="sainsrusti@gmail.com" required>
-                <button type="submit">Send Magic Code</button>
-            </form>
-        </div>
-        
-        <div id="step2" class="step ${sent ? 'active' : ''}">
-            ${error === 'otp' ? '<div class="error">❌ Invalid or expired code!</div>' : ''}
-            ${sent ? '<div class="success">✅ Magic code sent to your email!</div>' : ''}
-            <p>Enter the 6-digit code from your email:</p>
-            <form method="POST" action="/verify-otp">
-                <input type="text" name="otp" placeholder="123456" maxlength="6" class="otp-input" required>
-                <button type="submit">Verify & Access App</button>
-                <button type="button" onclick="window.location.href='/login'">Send New Code</button>
-            </form>
-        </div>
+        ${error === 'password' ? '<div class="error">❌ Incorrect password!</div>' : ''}
+        <p>Enter your password to access the app:</p>
+        <form method="POST" action="/verify-password">
+            <input type="password" name="password" placeholder="Enter password" class="password-input" required>
+            <button type="submit">Access Stylisti</button>
+        </form>
         
         <p style="font-size: 12px; color: #999; margin-top: 20px;">🔒 Private access only</p>
     </div>
@@ -258,49 +222,42 @@ app.get('/login', (req, res) => {
   `);
 });
 
-// Send OTP
-app.post('/send-otp', async (req, res) => {
-  const email = req.body.email;
-  const allowedEmail = 'sainsrusti@gmail.com';
+// Verify password for old system
+app.post('/verify-password', (req, res) => {
+  const password = req.body.password;
+  const correctPassword = process.env.STYLISTI_PASSWORD || 'default_password'; // Use environment variable
   
-  if (email !== allowedEmail) {
-    return res.redirect('/login?error=email');
+  if (password !== correctPassword) {
+    return res.redirect('/login?error=password');
   }
   
-  const otp = generateOTP();
-  const expiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes
-  
-  // Store OTP
-  otpStore.set(email, { otp, expiresAt });
-  
-  // Send OTP via email
-  await sendOTP(email, otp);
-  
-  res.redirect('/login?sent=1');
-});
-
-// Verify OTP
-app.post('/verify-otp', (req, res) => {
-  const otp = req.body.otp;
-  const email = 'sainsrusti@gmail.com';
-  
-  const storedData = otpStore.get(email);
-  
-  if (!storedData || storedData.expiresAt < Date.now() || storedData.otp !== otp) {
-    return res.redirect('/login?error=otp');
-  }
-  
-  // OTP is valid, set auth cookie
+  // Password is correct, set auth cookie
   res.cookie('stylisti-auth', 'verified', { 
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production'
   });
   
-  // Clean up used OTP
-  otpStore.delete(email);
-  
   res.redirect('/');
+});
+
+// Secure login verification endpoint
+app.post('/verify-login', express.json(), (req, res) => {
+  const password = req.body.password;
+  const correctPassword = process.env.STYLISTI_PASSWORD || 'default_password'; // Use environment variable
+  
+  if (password === correctPassword) {
+    // Set secure session
+    res.cookie('stylisti-auth', 'verified', { 
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict'
+    });
+    res.status(200).json({ success: true });
+  } else {
+    res.status(401).json({ success: false, message: 'Incorrect password' });
+  }
 });
 
 // PWA manifest route

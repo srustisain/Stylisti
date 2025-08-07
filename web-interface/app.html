@@ -58,11 +58,125 @@
             position: relative;
         }
 
+        /* Login Page Styles */
+        .login-container {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            background: linear-gradient(135deg, #8b2635 0%, #a53860 50%, #d4a574 100%);
+        }
+
+        .login-card {
+            background: white;
+            border-radius: 24px;
+            padding: 40px 32px;
+            box-shadow: var(--shadow-xl);
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+            animation: slideUp 0.6s ease-out;
+        }
+
+        @keyframes slideUp {
+            from { transform: translateY(30px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        .login-logo {
+            font-size: 36px;
+            font-weight: 700;
+            background: var(--gradient-primary);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 8px;
+        }
+
+        .login-subtitle {
+            font-size: 16px;
+            color: var(--text-secondary);
+            margin-bottom: 32px;
+        }
+
+        .login-form {
+            text-align: left;
+        }
+
+        .form-group {
+            margin-bottom: 24px;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: var(--text-primary);
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 16px;
+            border: 2px solid var(--border-color);
+            border-radius: 12px;
+            font-size: 16px;
+            outline: none;
+            transition: border-color 0.2s ease;
+            background: white;
+        }
+
+        .form-input:focus {
+            border-color: var(--accent-color);
+        }
+
+        .login-button {
+            width: 100%;
+            padding: 16px;
+            background: var(--gradient-primary);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+            margin-top: 8px;
+        }
+
+        .login-button:hover {
+            transform: translateY(-2px);
+        }
+
+        .login-button:active {
+            transform: translateY(0);
+        }
+
+        .password-hint {
+            font-size: 12px;
+            color: var(--text-light);
+            margin-top: 8px;
+            text-align: center;
+        }
+
+        .error-message {
+            color: #ef4444;
+            font-size: 14px;
+            margin-top: 8px;
+            text-align: center;
+        }
+
         /* App Container */
         .app {
             max-width: 100vw;
             min-height: 100vh;
             position: relative;
+            display: none;
+        }
+
+        .app.authenticated {
+            display: block;
         }
 
         /* Page Views */
@@ -843,17 +957,38 @@
     </style>
 </head>
 <body>
-    <div class="app">
-        <!-- Loading Screen -->
-        <div id="loadingScreen" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: white; display: flex; align-items: center; justify-content: center; z-index: 9999;">
-            <div style="text-align: center;">
-                <div style="font-size: 48px; margin-bottom: 20px;">👗</div>
-                <div style="font-size: 24px; font-weight: 600; margin-bottom: 10px;">Stylisti</div>
-                <div style="font-size: 16px; color: #666;">Loading your style assistant...</div>
+    <!-- Loading Screen -->
+    <div id="loadingScreen" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: white; display: flex; align-items: center; justify-content: center; z-index: 9999;">
+        <div style="text-align: center;">
+            <div style="font-size: 48px; margin-bottom: 20px;">👗</div>
+            <div style="font-size: 24px; font-weight: 600; margin-bottom: 10px;">Stylisti</div>
+            <div style="font-size: 16px; color: #666;">Loading your style assistant...</div>
+        </div>
+    </div>
+
+    <!-- Login Page -->
+    <div id="loginPage" class="login-container" style="display: none;">
+        <div class="login-card">
+            <div class="login-logo">Stylisti</div>
+                                <div class="login-subtitle">Srusti's personal style assistant</div>
+            <div class="login-form">
+                <div class="form-group">
+                    <label class="form-label">Password</label>
+                                                <input type="password" class="form-input" id="loginPassword" placeholder="Enter your password" onkeypress="handlePasswordKeyPress(event)" oninput="clearErrorMessage()">
+                </div>
+                <button class="login-button" onclick="authenticateUser()">
+                    <i class="fas fa-unlock-alt"></i> Unlock
+                </button>
+                <div class="password-hint">
+                    Forgot password? <a href="#" onclick="generatePassword()">Generate new</a>
+                </div>
+                <div id="errorMessage" class="error-message" style="display: none;"></div>
             </div>
         </div>
+    </div>
 
-
+    <!-- Main App Container -->
+    <div class="app" id="mainApp" style="display: none;">
 
         <!-- Home Page -->
         <div class="page active" id="homePage">
@@ -1226,6 +1361,7 @@
                 <div class="nav-label">Calendar</div>
             </div>
         </div>
+    </div>
     </div>
 
     <script>
@@ -2062,6 +2198,67 @@
                 }
             }, 10000);
         }
+
+        // Login Functionality
+        async function authenticateUser() {
+            const password = document.getElementById('loginPassword').value;
+            
+            try {
+                const response = await fetch('/verify-login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ password: password })
+                });
+                
+                if (response.ok) {
+                    // Hide login page and show main app
+                    document.getElementById('loginPage').style.display = 'none';
+                    document.getElementById('mainApp').style.display = 'block';
+                    console.log('✅ User authenticated successfully!');
+                    showPage('homePage'); // Show home page after successful login
+                } else {
+                    document.getElementById('loginPassword').value = ''; // Clear password field
+                    const errorMessage = document.getElementById('errorMessage');
+                    errorMessage.textContent = 'Incorrect password. Please try again.';
+                    errorMessage.style.display = 'block';
+                    console.log('❌ User authentication failed.');
+                }
+            } catch (error) {
+                console.error('Authentication error:', error);
+                const errorMessage = document.getElementById('errorMessage');
+                errorMessage.textContent = 'Connection error. Please try again.';
+                errorMessage.style.display = 'block';
+            }
+        }
+
+        function generatePassword() {
+            const newPassword = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+            document.getElementById('loginPassword').value = newPassword;
+            alert('New password generated: ' + newPassword);
+            console.log('✅ New password generated: ' + newPassword);
+        }
+
+        function handlePasswordKeyPress(event) {
+            if (event.key === 'Enter') {
+                authenticateUser();
+            }
+        }
+
+        function clearErrorMessage() {
+            const errorMessage = document.getElementById('errorMessage');
+            errorMessage.style.display = 'none';
+        }
+
+        // Initialize app with login flow
+        document.addEventListener('DOMContentLoaded', function() {
+            // Hide loading screen after a short delay
+            setTimeout(() => {
+                document.getElementById('loadingScreen').style.display = 'none';
+                document.getElementById('loginPage').style.display = 'flex';
+            }, 2000);
+        });
     </script>
 </body>
 </html>

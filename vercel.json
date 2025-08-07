@@ -33,19 +33,27 @@
     },
     {
       "src": "/manifest.json",
-      "dest": "/web-interface/server.js"
+      "dest": "/web-interface/manifest.json"
     },
     {
       "src": "/sw.js",
-      "dest": "/web-interface/server.js"
+      "dest": "/web-interface/sw.js"
     },
     {
       "src": "/icon-192.png",
-      "dest": "/web-interface/server.js"
+      "dest": "/web-interface/icon-192.png"
     },
     {
       "src": "/icon-512.png",
-      "dest": "/web-interface/server.js"
+      "dest": "/web-interface/icon-512.png"
+    },
+    {
+      "src": "/Stylisti.png",
+      "dest": "/web-interface/Stylisti.png"
+    },
+    {
+      "src": "/(.*\\.(png|jpg|jpeg|gif|ico|svg|css|js))",
+      "dest": "/web-interface/$1"
     },
     {
       "src": "/(.*)",
